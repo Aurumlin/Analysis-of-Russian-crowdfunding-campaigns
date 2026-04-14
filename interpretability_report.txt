@@ -1,0 +1,241 @@
+→ читаю /Users/akulinayuman/Downloads/Диплом_2/projects_sample_with_text.xlsx
+  shape: (99, 67)
+  признаков: 21, целевых: 42 / 99
+  признаки: ['log_goal', 'campaign_duration_days', 'counts.newsCount', 'counts.commentsCount', 'card.author.campaignsAmount', 'has_video', 'log_text_length', 'image_count', 'external_link_count', 'social_score', 'gratitude_score', 'we_ratio', 'certainty_score', 'uncertainty_score', 'readability_avg', 'rubert_positive', 'rubert_negative', 'topic_0', 'topic_1', 'topic_2', 'topic_3']
+
+── 0. Train / Test split (80/20) ──
+  train: 79  test: 20
+  train success/fail: 34/45
+  test  success/fail: 8/12
+
+── нормализация readability признаков (fit на train) ──
+  параметры сохранены: /Users/akulinayuman/Downloads/Диплом_2/figures/readability_scaler_params.json
+=== Readability Normalization Summary ===
+Fitted: True, fit_on_train: True
+
+readability_avg           mean=-30.012, std=12.402, n=79
+
+── 1. Обучение моделей ──
+  обучено: ['RandomForest', 'LightGBM']
+
+── Метрики на test ──
+
+RandomForest:
+              precision    recall  f1-score   support
+
+           0       0.69      0.75      0.72        12
+           1       0.57      0.50      0.53         8
+
+    accuracy                           0.65        20
+   macro avg       0.63      0.62      0.63        20
+weighted avg       0.64      0.65      0.65        20
+
+
+LightGBM:
+              precision    recall  f1-score   support
+
+           0       0.67      0.50      0.57        12
+           1       0.45      0.62      0.53         8
+
+    accuracy                           0.55        20
+   macro avg       0.56      0.56      0.55        20
+weighted avg       0.58      0.55      0.55        20
+
+       model  ROC_AUC   PR_AUC       F1
+RandomForest  0.71875 0.681277 0.533333
+    LightGBM  0.68750 0.731667 0.526316
+
+── Визуализация числовых признаков ──
+  Spearman r с is_successful:
+topic_0                       -0.1591
+rubert_negative               -0.1563
+log_goal                      -0.1466
+campaign_duration_days        -0.1008
+log_text_length               -0.0504
+card.author.campaignsAmount   -0.0202
+rubert_positive                0.0032
+certainty_score                0.0301
+topic_3                        0.0747
+topic_1                        0.1305
+image_count                    0.1317
+topic_2                        0.1463
+gratitude_score                0.1678
+social_score                   0.1691
+we_ratio                       0.2226
+uncertainty_score              0.2226
+external_link_count            0.2286
+has_video                      0.2320
+readability_avg                0.2664
+counts.newsCount               0.3787
+counts.commentsCount           0.3807
+
+── Permutation Importance (test) ──
+
+RandomForest — топ признаки:
+counts.newsCount          0.1016
+counts.commentsCount      0.0542
+social_score              0.0354
+campaign_duration_days    0.0328
+rubert_negative           0.0312
+external_link_count       0.0234
+
+LightGBM — топ признаки:
+counts.newsCount          0.1141
+counts.commentsCount      0.0453
+uncertainty_score         0.0427
+campaign_duration_days    0.0198
+topic_1                   0.0099
+has_video                 0.0094
+
+── PDP + ICE ──
+  признаки для PDP/ICE: ['readability_avg', 'counts.newsCount', 'we_ratio', 'counts.commentsCount', 'uncertainty_score', 'log_goal']
+
+── TreeSHAP ──
+
+  RandomForest...
+    топ SHAP mean(|v|):
+readability_avg         0.04537
+we_ratio                0.04368
+counts.newsCount        0.04089
+log_goal                0.03039
+uncertainty_score       0.02668
+counts.commentsCount    0.02353
+
+  LightGBM...
+    топ SHAP mean(|v|):
+log_goal                0.90970
+readability_avg         0.69363
+counts.newsCount        0.67244
+uncertainty_score       0.63750
+counts.commentsCount    0.58564
+topic_2                 0.45655
+
+── Средний SHAP по категориям ──
+
+RandomForest — средний SHAP по категориям (топ 8 признаков):
+                  we_ratio  counts.newsCount  readability_avg  log_goal  social_score  topic_0  counts.commentsCount  rubert_negative
+category_grouped                                                                                                                     
+Бизнес              0.0696            0.0570           0.0409    0.0231        0.0230   0.0231                0.0652           0.0050
+Досуг и события    -0.0324            0.0309          -0.0675   -0.0416       -0.0096  -0.0033               -0.0049           0.0160
+Медиа и контент    -0.0431           -0.0552           0.0251    0.0249       -0.0317   0.0231                0.0052          -0.0000
+Социальные         -0.0009            0.0035           0.0044   -0.0060        0.0033  -0.0057               -0.0030          -0.0062
+Творческие          0.0650           -0.0485           0.0310    0.0300        0.0248   0.0228               -0.0208           0.0151
+Технологии         -0.0380            0.0463          -0.0707    0.0220       -0.0302  -0.0394                0.0113           0.0071
+
+LightGBM — средний SHAP по категориям (топ 8 признаков):
+                  log_goal  counts.newsCount  readability_avg  counts.commentsCount  uncertainty_score  topic_2  we_ratio  rubert_negative
+category_grouped                                                                                                                          
+Бизнес              0.8038            0.8259           0.3728                0.7096             1.5243  -0.6861    0.5862          -0.1977
+Досуг и события    -1.4621            0.5600          -1.0315                0.1102             0.0468  -0.3035   -0.2192           0.2569
+Медиа и контент     0.6515           -0.8096           0.4212               -0.1434             0.8610   0.6413   -0.4671          -0.2076
+Социальные         -0.1234           -0.0038           0.0803               -0.0206            -0.2058  -0.0378   -0.0014          -0.0937
+Творческие          0.7569           -0.7678           0.5331               -0.3653            -0.4205  -0.1010    0.5956           0.4639
+Технологии          0.7846            1.2544          -1.1817                0.3339            -0.0287   0.6657   -0.3876           0.2951
+
+── LIME: 3 примера из test ──
+
+  RandomForest, пример #0 (true=success, P=0.86):
+    ↑ counts.commentsCount > 12.00: +0.1132
+    ↑ uncertainty_score > 0.00: +0.0882
+    ↑ we_ratio > 0.03: +0.0826
+    ↑ 10.99 < log_goal <= 11.98: +0.0481
+    ↑ social_score > 0.08: +0.0438
+    ↑ readability_avg > 0.31: +0.0399
+
+  RandomForest, пример #1 (true=success, P=0.51):
+    ↑ counts.commentsCount > 12.00: +0.1019
+    ↑ uncertainty_score > 0.00: +0.0819
+    ↓ counts.newsCount <= 1.00: -0.0685
+    ↑ readability_avg > 0.31: +0.0578
+    ↓ we_ratio <= 0.01: -0.0436
+    ↑ topic_2 > 0.00: +0.0359
+
+  RandomForest, пример #2 (true=fail, P=0.12):
+    ↓ counts.newsCount <= 1.00: -0.1043
+    ↓ counts.commentsCount <= 0.00: -0.0830
+    ↓ social_score <= 0.03: -0.0546
+    ↓ 19.00 < image_count <= 25.00: -0.0519
+    ↓ rubert_positive > 0.33: -0.0475
+    ↑ 0.00 < topic_3 <= 0.00: +0.0306
+
+  LightGBM, пример #0 (true=success, P=0.98):
+    ↑ uncertainty_score > 0.00: +0.2771
+    ↑ counts.commentsCount > 12.00: +0.2131
+    ↑ 10.99 < log_goal <= 11.98: +0.1364
+    ↑ we_ratio > 0.03: +0.1139
+    ↓ 0.00 < topic_2 <= 0.00: -0.1015
+    ↑ 4.00 < counts.newsCount <= 10.00: +0.0902
+
+  LightGBM, пример #1 (true=success, P=0.93):
+    ↑ counts.commentsCount > 12.00: +0.2364
+    ↑ uncertainty_score > 0.00: +0.2358
+    ↓ counts.newsCount <= 1.00: -0.1978
+    ↑ log_goal <= 10.99: +0.1727
+    ↑ topic_2 > 0.00: +0.1693
+    ↑ readability_avg > 0.31: +0.1481
+
+  LightGBM, пример #2 (true=fail, P=0.03):
+    ↓ counts.commentsCount <= 0.00: -0.2588
+    ↑ 10.99 < log_goal <= 11.98: +0.1908
+    ↓ counts.newsCount <= 1.00: -0.1708
+    ↓ 7.60 < log_text_length <= 7.93: -0.1005
+    ↓ -0.57 < readability_avg <= -0.06: -0.0984
+    ↑ 0.00 < topic_3 <= 0.00: +0.0710
+
+── GAM (pyGAM LogisticGAM) ──
+  GAM ROC-AUC (test): 0.6042
+  ✓ GAM partial effects сохранены
+
+── Learning Curves ──
+
+  RandomForest:
+    train_sizes: [13, 20, 28, 35, 43, 50, 58, 66]
+    val AUC:     [0.694, 0.756, 0.771, 0.716, 0.724, 0.753, 0.788, 0.766]
+
+  LightGBM:
+    train_sizes: [13, 20, 28, 35, 43, 50, 58, 66]
+    val AUC:     [0.5, 0.5, 0.5, 0.5, 0.591, 0.654, 0.674, 0.704]
+
+── Ошибки по сегментам ──
+
+  RandomForest | сегмент: категория
+           _seg  n  accuracy  fp_rate  fn_rate  mean_proba
+         Бизнес  1     1.000    0.000    0.000       0.858
+Досуг и события  2     0.000    0.000    1.000       0.383
+Медиа и контент  2     1.000    0.000    0.000       0.463
+     Социальные 12     0.667    0.167    0.167       0.421
+     Творческие  2     0.500    0.500    0.000       0.539
+     Технологии  1     1.000    0.000    0.000       0.364
+
+  RandomForest | сегмент: квартиль_цели
+_seg  n  accuracy  fp_rate  fn_rate  mean_proba
+   0  5     0.800    0.200     0.00       0.534
+   1  6     0.833    0.167     0.00       0.496
+   2  4     0.500    0.250     0.25       0.418
+   3  5     0.400    0.000     0.60       0.344
+
+  RandomForest | сегмент: has_video
+_seg  n  accuracy  fp_rate  fn_rate  mean_proba
+   0  5       0.8      0.0      0.2       0.346
+   1 15       0.6      0.2      0.2       0.487
+
+  LightGBM | сегмент: категория
+           _seg  n  accuracy  fp_rate  fn_rate  mean_proba
+         Бизнес  1     1.000     0.00    0.000       0.985
+Досуг и события  2     0.000     0.00    1.000       0.242
+Медиа и контент  2     1.000     0.00    0.000       0.641
+     Социальные 12     0.667     0.25    0.083       0.479
+     Творческие  2     0.000     1.00    0.000       0.695
+     Технологии  1     0.000     1.00    0.000       0.792
+
+  LightGBM | сегмент: квартиль_цели
+_seg  n  accuracy  fp_rate  fn_rate  mean_proba
+   0  5     0.600    0.400      0.0       0.712
+   1  6     0.667    0.333      0.0       0.636
+   2  4     0.500    0.500      0.0       0.528
+   3  5     0.400    0.000      0.6       0.240
+
+  LightGBM | сегмент: has_video
+_seg  n  accuracy  fp_rate  fn_rate  mean_proba
+   0  5     0.600    0.200    0.200       0.422
+   1 15     0.533    0.333    0.133       0.572

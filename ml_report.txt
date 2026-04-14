@@ -1,0 +1,57 @@
+→ читаю /Users/akulinayuman/Downloads/Диплом_2/projects_sample_with_text.xlsx
+  n=99, успешных: 42
+
+[INFO] Добавлены категориальные дамми (6 переменных): cat_Досуг и события, cat_Медиа и контент, cat_Образование и просвещение, cat_Социальные, cat_Творческие, cat_Технологии
+
+CV: Stratified 5-Fold (n=99, min_class=42)
+
+── Сравнение моделей × наборов признаков ──
+                      set        model  ROC_AUC  PR_AUC     F1  Precision  Recall
+       A (controls + cat)    LogReg_L1   0.7297  0.6551 0.6364     0.6087  0.6667
+       A (controls + cat) RandomForest   0.7657  0.7192 0.6410     0.6944  0.5952
+       A (controls + cat)    GradBoost   0.7335  0.7172 0.6047     0.5909  0.6190
+       A (controls + cat)     LightGBM   0.7446  0.7321 0.6437     0.6222  0.6667
+       A (controls + cat)      XGBoost   0.7602  0.7317 0.6585     0.6750  0.6429
+            B (text only)    LogReg_L1   0.6280  0.5578 0.5495     0.5102  0.5952
+            B (text only) RandomForest   0.6067  0.5706 0.5250     0.5526  0.5000
+            B (text only)    GradBoost   0.5616  0.4822 0.5185     0.5385  0.5000
+            B (text only)     LightGBM   0.6017  0.5753 0.4706     0.4651  0.4762
+            B (text only)      XGBoost   0.6142  0.5816 0.4872     0.5278  0.4524
+C (controls + cat + text)    LogReg_L1   0.7147  0.6387 0.6364     0.6087  0.6667
+C (controls + cat + text) RandomForest   0.7646  0.7472 0.6053     0.6765  0.5476
+C (controls + cat + text)    GradBoost   0.7018  0.6381 0.5542     0.5610  0.5476
+C (controls + cat + text)     LightGBM   0.7352  0.7333 0.6500     0.6842  0.6190
+C (controls + cat + text)      XGBoost   0.8091  0.8105 0.6829     0.7000  0.6667
+
+✓ лучшая: XGBoost × C (controls + cat + text) (AUC=0.8091)
+
+── SHAP mean(|value|) ранжирование ──
+counts.newsCount                 0.0621
+cat_Социальные                   0.0540
+counts.commentsCount             0.0505
+readability_avg                  0.0391
+uncertainty_score                0.0353
+number_density                   0.0334
+we_ratio                         0.0297
+log_goal                         0.0284
+rubert_negative                  0.0199
+external_link_count              0.0197
+social_score                     0.0166
+gratitude_score                  0.0147
+campaign_duration_days           0.0146
+image_count                      0.0120
+money_mentions                   0.0118
+has_video                        0.0101
+cat_Творческие                   0.0090
+log_text_length                  0.0084
+rubert_positive                  0.0081
+card.author.campaignsAmount      0.0067
+has_specific_sum                 0.0051
+cat_Образование и просвещение    0.0050
+i_ratio                          0.0036
+certainty_score                  0.0033
+cat_Досуг и события              0.0012
+cat_Медиа и контент              0.0012
+cat_Технологии                   0.0004
+
+✓ графики: figures/shap_beeswarm.png, figures/shap_bar.png
