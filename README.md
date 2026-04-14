@@ -1,4 +1,3 @@
-# Analysis-of-Russian-crowdfunding-campaigns
 # Техническая документация
 
 Проект: анализ факторов успеха reward-based краудфандинговых кампаний на Planeta.ru.
@@ -14,19 +13,30 @@
 Диплом_2/
 ├── Planeta.ipynb                     # парсинг JSON → DataFrame + EDA
 ├── projects_planeta.xlsx             # полный датасет (~12 МБ)
-├── projects_sample.xlsx              # sample из 10 проектов (для отладки)
+├── projects_sample.xlsx              # рабочая выборка (~99 проектов)
 ├── projects_sample_with_text.xlsx    # sample + текстовые признаки (результат 1-го шага)
 ├── dicts.py                          # словари LIWC-подобных категорий
 ├── text_features.py                  # функции извлечения признаков 1.1–1.5
 ├── extract_features.py               # полный пайплайн признаков (1.1–1.7)
+├── lda_transformer.py                # ✨ sklearn-совместимый обёртка gensim LDA (без data leakage)
+├── detailed_eda.py                   # ✨ подробный EDA → eda_detailed/
 ├── eda_text_features.py              # Mann-Whitney + point-biserial + violin-plots
-├── econometrics.py                   # Logit / OLS / VIF / LASSO
+├── econometrics.py                   # Logit / OLS / VIF / LASSO / Tobit
 ├── ml_models.py                      # LogReg / RF / GBM / LGBM / XGB + SHAP
 ├── shap_tfidf.py                     # SHAP на уровне слов через TF-IDF
 ├── interpretability.py               # PDP / ICE / Permutation / LIME / GAM / TreeSHAP
 ├── normalization_scaler.py           # ✨ управление параметрами z-score (воспроизводимость)
+├── run_all.py                        # единая точка запуска пайплайна
 ├── figures/                          # все PNG-графики
 │   └── readability_scaler_params.json # сохранённые параметры нормализации (из interpretability.py)
+├── eda_detailed/                     # ✨ подробный EDA (из detailed_eda.py)
+│   ├── summary/                      # overview.csv, numeric_describe.csv, missing_report.csv, target_balance.csv
+│   ├── distributions/                # гистограмма + boxplot для каждого числового признака
+│   ├── correlations/                 # heatmap корреляций
+│   ├── target_analysis/              # violin / box по is_successful
+│   ├── bivariate/                    # scatter vs funding_ratio
+│   ├── categorical/                  # bar plots категорий
+│   └── REPORT.md                     # сводный отчёт
 ├── eda_results.csv                   # таблица статтестов
 ├── shap_words_report.csv             # топ-слова с SHAP-вкладом
 ├── econometrics_report.txt           # полный лог regression-моделей
@@ -49,9 +59,11 @@ projects_sample.xlsx        ←  фича-инжиниринг: log_goal, has_vi
    ▼
 projects_sample_with_text.xlsx
    │
+   ├── detailed_eda.py          → eda_detailed/ (подробный EDA: distributions, correlations, target_analysis, …)
    ├── eda_text_features.py     → eda_results.csv + figures/violin_*.png
    ├── econometrics.py          → econometrics_report.txt
    ├── ml_models.py             → ml_report.txt + figures/shap_*.png
+   │     (использует lda_transformer.py внутри CV fold)
    ├── interpretability.py      → interpretability_report.txt + figures/interp_*.png
    └── shap_tfidf.py            → shap_words_report.csv + figures/tfidf_*.png
 ```
@@ -551,9 +563,77 @@ shap_values = explainer.shap_values(X)
 
 TreeSHAP на RandomForest: `shap_beeswarm.png`, `shap_bar.png`, таблица `mean(|SHAP|)`.
 
+### 6.6 LDATransformer — предотвращение утечки данных при LDA
+
+LDA-топики **не берутся** из precomputed столбцов `topic_0..3` в Excel.
+Вместо этого используется `lda_transformer.py`:
+
+```python
+from lda_transformer import LDATransformer
+from sklearn.pipeline import Pipeline
+
+# LDA обучается ТОЛЬКО на train fold внутри каждого split
+pipe = Pipeline([
+    ("lda", LDATransformer(num_topics=5)),
+    ("clf", RandomForestClassifier()),
+])
+cross_val_predict(pipe, texts_series, y, cv=5, method="predict_proba")
+```
+
+**Почему это важно:**
+- Если обучить LDA на полном датасете перед CV-split, тест-фолд участвует в построении тематического пространства → **data leakage**.
+- `LDATransformer.fit()` строит `gensim.Dictionary` и `LdaModel` только на train fold.
+- `transform()` применяет уже обученную модель к любому набору документов (train или test).
+
+**Параметры `LDATransformer`:**
+
+| Параметр | По умолчанию | Описание |
+|---|---|---|
+| `num_topics` | 5 | Число тем |
+| `passes` | 10 | Число проходов LDA |
+| `random_state` | 42 | Seed для воспроизводимости |
+| `no_below` | 2 | filter_extremes: min число документов |
+| `no_above` | 0.9 | filter_extremes: max доля документов |
+| `min_docs_for_filter` | 30 | При N < 30 filter_extremes не применяется |
+
+Выход трансформера: `(N, num_topics)` — вероятности тем, имена признаков `lda_topic_0..lda_topic_{K-1}`.
+
 ---
 
-## 7. Интерпретация (`interpretability.py`)
+## 7. Детальный EDA (`detailed_eda.py`)
+
+Запускается после `extract_features.py`. Читает `projects_sample_with_text.xlsx` и сохраняет
+результаты в папку `eda_detailed/`:
+
+```
+eda_detailed/
+  ├── summary/
+  │   ├── overview.csv              — тип, null%, uniq, min/max для каждого признака
+  │   ├── numeric_describe.csv      — describe() для числовых столбцов
+  │   ├── categorical_counts.csv    — value_counts() для категориальных
+  │   ├── missing_report.csv        — пропущенные значения (абс. + %)
+  │   └── target_balance.csv        — баланс is_successful (0/1)
+  ├── distributions/                — гистограмма + boxplot для каждой числовой переменной
+  ├── correlations/                 — heatmap матриц корреляций
+  ├── target_analysis/              — violin / box в разрезе is_successful
+  ├── bivariate/                    — scatter каждого признака vs funding_ratio
+  ├── categorical/                  — bar plots категориальных переменных
+  └── REPORT.md                     — сводный Markdown-отчёт
+```
+
+**Целевые переменные:** `is_successful` (бинарный) и `funding_ratio` (непрерывный).
+
+**Пропускаются:** текстовые поля (`description.text`, `clean_text`, URL-столбцы, даты).
+
+Запуск:
+```bash
+python3 detailed_eda.py
+# или через run_all.py --only detailed_eda
+```
+
+---
+
+## 8. Интерпретация (`interpretability.py`)
 
 Конвейер на train/test (80/20, stratified):
 
@@ -570,7 +650,7 @@ TreeSHAP на RandomForest: `shap_beeswarm.png`, `shap_bar.png`, таблица 
 
 ---
 
-## 8. SHAP на уровне слов (`shap_tfidf.py`)
+## 9. SHAP на уровне слов (`shap_tfidf.py`)
 
 1. `clean_text` + лемматизация `pymorphy3`.
 2. `TfidfVectorizer(max_features=500, min_df=2, ngram_range=(1,2))`.
@@ -581,12 +661,12 @@ TreeSHAP на RandomForest: `shap_beeswarm.png`, `shap_bar.png`, таблица 
 
 ---
 
-## 9. Запуск
+## 10. Запуск
 
 ### Быстрый запуск всего пайплайна
 
 ```bash
-# Всё подряд (extract → eda → econ → ml → interp → tfidf)
+# Всё подряд (extract → detailed_eda → eda → econ → ml → interp → tfidf)
 python3 run_all.py
 
 # Только указанные шаги
@@ -603,6 +683,18 @@ python3 run_all.py --stop-on-error
 ```
 
 `run_all.py` выводит сводку с временем каждого шага и финальным статусом.
+
+**Полный список шагов:**
+
+| Ключ | Скрипт | Описание |
+|---|---|---|
+| `extract` | `extract_features.py` | Извлечение текстовых признаков (1.1–1.7) |
+| `detailed_eda` | `detailed_eda.py` | Детальный EDA → `eda_detailed/` |
+| `eda` | `eda_text_features.py` | EDA + статтесты + violin-plots |
+| `econ` | `econometrics.py` | Logit / OLS / Tobit / LASSO |
+| `ml` | `ml_models.py` | ML-модели + SHAP |
+| `interp` | `interpretability.py` | PDP / ICE / Permutation / LIME / GAM |
+| `tfidf` | `shap_tfidf.py` | SHAP на уровне слов через TF-IDF |
 
 ### Запуск отдельных скриптов
 
@@ -634,7 +726,7 @@ python3 shap_tfidf.py
 
 ---
 
-## 10. Исправленные проблемы (Data Leakage & Multicollinearity)
+## 11. Исправленные проблемы (Data Leakage & Multicollinearity)
 
 ### ✅ Data Leakage + Non-Reproducibility в `readability_avg` (ИСПРАВЛЕНО)
 
@@ -950,11 +1042,13 @@ result = compute_collectivism(text, normalize_to_tokens=False)
 
 ---
 
-## 11. Исправленные проблемы (продолжение)
+## 12. Исправленные проблемы (продолжение)
 
-### ✅ Проблема 7: LDA — K=5 выбрано произвольно (ИСПРАВЛЕНО)
+### ⚠️ Проблема 7: LDA — K=5 выбрано произвольно (ЧАСТИЧНО)
 
-**Проблема:** В `extract_features.py` число тем для LDA жёстко закодировано как `K=5`. Это произвольный выбор без обоснования, и может быть субоптимальным для данного корпуса. На малых выборках (N=10–100) это критично.
+**Текущее состояние:** `extract_features.py` по-прежнему использует `num_topics=5` (фиксировано). Auto-K по Coherence Score описан ниже как рекомендуемое улучшение, но в production-коде ещё не активирован. `lda_transformer.py` (внутри ML-пайплайна) также использует `num_topics=5`.
+
+**Проблема:** В `extract_features.py` число тем для LDA жёстко закодировано как `K=5`. Это произвольный выбор без обоснования, и может быть субоптимальным для данного корпуса.
 
 **Решение: Coherence Score автоматический подбор K**
 
@@ -1058,19 +1152,32 @@ def add_lda_topics(df, text_col=CLEAN_COL, auto_k=True, k_range=range(2, 11)):
 
 ---
 
-## 12. Проблемы
+## 13. Что не доделано
 
-1. **Все скрипты запускаются на `projects_sample.xlsx` (N = 10).** Это демо-выборка.
-   Все логиты в `econometrics_report.txt` пропущены, т.к. предикторов больше, чем
-   наблюдений. ML-метрики на LOOCV с N=10 неинтерпретируемы (AUC скачет 0.0 ↔ 1.0).
-   **Шаг, который нужно сделать:** запустить `Planeta.ipynb` → получить полный
-   нормализованный датасет из `projects_planeta.xlsx`, сохранить в
-   `projects_sample.xlsx` (или заменить путь `INPUT_FILE` в `extract_features.py`)
-   и прогнать пайплайн заново. На полном датасете (~тысячи проектов) статистические
-   тесты станут содержательны.
+1. **`projects_sample.xlsx` (N ≈ 99) — не полный датасет.** Пайплайн работает на
+   рабочей выборке (~99 проектов). Stratified 5-Fold CV уже активен (N > 30), метрики
+   содержательны (лучший XGBoost × C: AUC=0.81). Для финального анализа нужно
+   запустить `Planeta.ipynb` → экспортировать полный датасет из `projects_planeta.xlsx`
+   в `projects_sample.xlsx` и прогнать пайплайн заново. На полных данных (~тысячи
+   проектов) эконометрика и ML будут статистически надёжнее.
 
 2. **Конфликт `pymorphy2` / `pymorphy3` на Python 3.13.** Для 3.11+ рекомендуется
    `pymorphy3` (в коде уже стоит try/except).
 
-5. **XGBoost при LOOCV возвращает AUC=0.0** — баг связан с бинарным predict_proba
-   на крошечной выборке. На полных данных пропадёт сам.
+3. **LDA auto-K (Coherence Score) не активирован в `extract_features.py`.**
+   Алгоритм подбора описан в секции §12 и реализован концептуально, но `extract_features.py`
+   и `lda_transformer.py` используют фиксированный `K=5`. Для активации: добавить
+   вызов `find_optimal_k()` перед обучением LDA в `add_lda_topics()`.
+
+4. ~~**Категориальные дамми (`category_grouped`)** подхватываются только в
+   `econometrics.py`.~~ ✅ Исправлено — `ml_models.py` создаёт one-hot дамми через
+   `pd.get_dummies(drop_first=True)` в функции `prepare()` и включает их в наборы A и C.
+
+5. ~~**XGBoost при LOOCV возвращает AUC=0.0**~~ — При N=99 используется Stratified
+   5-Fold CV, проблема неактуальна.
+
+6. ~~**Нет единого `run_all.py`**~~ ✅ Исправлено — создан `run_all.py` с флагами `--only`, `--skip`, `--stop-on-error`.
+
+7. **Юникодные графики (кириллические подписи)** — `detailed_eda.py` явно задаёт
+   `plt.rcParams["font.family"] = "DejaVu Sans"`. В остальных скриптах шрифт не
+   настроен. Если подписи ломаются, добавить ту же строку в начало скрипта.
