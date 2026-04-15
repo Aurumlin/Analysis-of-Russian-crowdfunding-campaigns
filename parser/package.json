@@ -1,0 +1,14 @@
+{
+  "name": "planeta-parser",
+  "version": "1.0.0",
+  "description": "Параллельный парсер проектов Planeta.ru на Playwright",
+  "type": "module",
+  "scripts": {
+    "parse": "node parse-planeta.mjs",
+    "parse:headed": "node parse-planeta.mjs --headed",
+    "parse:boomstarter": "node parse-boomstarter.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.53.0"
+  }
+}
