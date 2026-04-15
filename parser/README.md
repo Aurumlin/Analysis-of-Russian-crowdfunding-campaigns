@@ -1,5 +1,7 @@
 # Planeta Parser (Playwright)
 
+ПОЛНЫЙ ПАРСЕР ДОСТУПЕН ПО ССЫЛКЕ: https://disk.yandex.ru/d/OW4IzxLVtf4ihQ
+
 Параллельный парсер карточек проектов `planeta.ru/campaigns/*`.
 
 Собирает:
